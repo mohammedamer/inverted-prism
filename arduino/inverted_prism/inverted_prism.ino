@@ -3,6 +3,7 @@
    by Dejan, https://howtomechatronics.com
 */
 #include <Wire.h>
+#include <PID_v1.h>
 
 // Motor Shield Rev3 – Channel A pins
 const int dirA = 12;   // direction
@@ -23,6 +24,18 @@ int c = 0;
 
 bool initAngle = true;
 
+double Setpoint;  // what you want (target angle, speed, etc.)
+double Input;     // what you measure (current angle from IMU)
+double Output;    // what PID computes (motor command)
+
+// PID gains – start small and tune later
+double Kp = 2.0;
+double Ki = 0.0;
+double Kd = 0.5;
+
+// Kp, Ki, Kd are your gains
+PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+
 void setup() {
   Serial.begin(9600);
   Wire.begin();                 // Initialize comunication
@@ -41,6 +54,10 @@ void setup() {
 
   // Start with brake released
   digitalWrite(brakeA, LOW);
+
+  Setpoint = 0.0;  // e.g. keep platform level at 0 degrees
+  myPID.SetMode(AUTOMATIC);
+  myPID.SetOutputLimits(-255, 255);  // so we can map to motor speed and direction
 
   delay(20);
 }
@@ -98,37 +115,42 @@ void loop() {
   pitch = 0.96 * gyroAngleY + 0.04 * accAngleY;
 
   // Print the values on the serial monitor
-  Serial.print("roll: ");
-  Serial.println(roll);
+  // Serial.print("roll: ");
+  // Serial.println(roll);
   // Serial.print(" / pitch: ");
   // Serial.print(pitch);
   // Serial.print(" / yaw: ");
   // Serial.println(yaw);
 
-  int speed = 0;
-  int dir = 0;
+  Input = -roll;
 
-  if (roll > 0) {
+  // 2) Compute PID
+  myPID.Compute();  // updates Output
 
-    speed = 128;
-    dir = HIGH;
+  driveMotor(Output);
 
-  } else if (roll < 0) {
 
-    speed = 128;
-    dir = LOW;
+  // Optional debugging
+  Serial.print("roll: ");
+  Serial.print(roll);
+  Serial.print(" / Output: ");
+  Serial.println(Output);
+}
 
-  } else {
-    speed = 0;
-
-    digitalWrite(brakeA, HIGH);  // active brake
-    delay(20);
+// Map PID Output (-255..255) to motor direction + PWM
+void driveMotor(double cmd) {
+  // Deadband to avoid jitter near 0
+  if (cmd > -5 && cmd < 5) {
+    analogWrite(pwmA, 0);
+    return;
   }
 
-  if (speed > 0) {
-    digitalWrite(brakeA, LOW);  // release brake
-    digitalWrite(dirA, dir);    // set direction
-    analogWrite(pwmA, speed);   // 0–255, full speed
+  if (cmd > 0) {
+    digitalWrite(dirA, HIGH);     // one direction
+    analogWrite(pwmA, (int)cmd);  // speed
+  } else {
+    digitalWrite(dirA, LOW);         // opposite direction
+    analogWrite(pwmA, (int)(-cmd));  // speed is magnitude
   }
 }
 
