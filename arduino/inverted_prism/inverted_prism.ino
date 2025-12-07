@@ -4,6 +4,11 @@
 */
 #include <Wire.h>
 
+// Motor Shield Rev3 – Channel A pins
+const int dirA = 12;   // direction
+const int brakeA = 9;  // brake
+const int pwmA = 3;    // speed (PWM)
+
 const int MPU = 0x68;  // MPU6050 I2C address
 float AccX, AccY, AccZ;
 float GyroX, GyroY, GyroZ;
@@ -28,6 +33,15 @@ void setup() {
 
   // Call this function if you need to get the IMU error values for your module
   // calculate_IMU_error();
+
+  // init motor
+  pinMode(dirA, OUTPUT);
+  pinMode(brakeA, OUTPUT);
+  pinMode(pwmA, OUTPUT);
+
+  // Start with brake released
+  digitalWrite(brakeA, LOW);
+
   delay(20);
 }
 
@@ -90,6 +104,32 @@ void loop() {
   // Serial.print(pitch);
   // Serial.print(" / yaw: ");
   // Serial.println(yaw);
+
+  int speed = 0;
+  int dir = 0;
+
+  if (roll > 0) {
+
+    speed = 128;
+    dir = HIGH;
+
+  } else if (roll < 0) {
+
+    speed = 128;
+    dir = LOW;
+
+  } else {
+    speed = 0;
+
+    digitalWrite(brakeA, HIGH);  // active brake
+    delay(20);
+  }
+
+  if (speed > 0) {
+    digitalWrite(brakeA, LOW);  // release brake
+    digitalWrite(dirA, dir);    // set direction
+    analogWrite(pwmA, speed);   // 0–255, full speed
+  }
 }
 
 void calculate_IMU_error() {
