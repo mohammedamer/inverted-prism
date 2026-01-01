@@ -33,6 +33,10 @@ double Kp = 2.0;
 double Ki = 0.0;
 double Kd = 0.5;
 
+double outLimit = 100;
+
+double prevCmd = 0;
+
 // Kp, Ki, Kd are your gains
 PID myPID(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 
@@ -57,7 +61,7 @@ void setup() {
 
   Setpoint = 0.0;  // e.g. keep platform level at 0 degrees
   myPID.SetMode(AUTOMATIC);
-  myPID.SetOutputLimits(-255, 255);  // so we can map to motor speed and direction
+  myPID.SetOutputLimits(-outLimit, outLimit);  // so we can map to motor speed and direction
 
   delay(20);
 }
@@ -140,17 +144,46 @@ void loop() {
 // Map PID Output (-255..255) to motor direction + PWM
 void driveMotor(double cmd) {
   // Deadband to avoid jitter near 0
-  if (cmd > -5 && cmd < 5) {
+  // if (cmd > -5 && cmd < 5) {
+  //   analogWrite(pwmA, 0);
+  //   return;
+  // }
+
+  if (cmd == 0) {
+    digitalWrite(brakeA, HIGH);
     analogWrite(pwmA, 0);
     return;
   }
 
   if (cmd > 0) {
+    
+    if (prevCmd < 0){
+      digitalWrite(brakeA, HIGH);
+      analogWrite(pwmA, 0);
+
+      delay(500);
+
+      digitalWrite(brakeA, LOW);
+    }
+
     digitalWrite(dirA, HIGH);     // one direction
     analogWrite(pwmA, (int)cmd);  // speed
   } else {
+
+
+    if (prevCmd > 0){
+      digitalWrite(brakeA, HIGH);
+      analogWrite(pwmA, 0);
+
+      delay(500);
+
+      digitalWrite(brakeA, LOW);
+    }
+
     digitalWrite(dirA, LOW);         // opposite direction
     analogWrite(pwmA, (int)(-cmd));  // speed is magnitude
+
+    prevCmd = cmd;
   }
 }
 
